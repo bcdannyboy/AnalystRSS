@@ -1,144 +1,202 @@
 # AnalystRSS
 
-Analyze the analysts, then analyze their analysis.
+**Analyze the analysts, then analyze their analysis**
 
-## Overview
+---
 
-**AnalystRSS** is a Python utility designed to evaluate the prediction accuracy of financial analysts. It fetches analyst price targets and stock prices, analyzes the analysts' historical performance, identifies the top analysts, and generates an RSS feed with their latest reports. This allows users to stay updated with insights from the most accurate financial analysts.
+## Introduction
+
+AnalystRSS is a powerful utility designed to evaluate the prediction accuracy of financial analysts. By fetching analysts' price targets and comparing them with actual stock prices over a customizable time horizon, it identifies the top-performing analysts based on historical performance. The tool then generates an RSS feed with the latest reports from these top analysts, updating it every 12 hours. AnalystRSS automates the entire process, providing investors and researchers with insights into analyst performance to inform investment decisions.
+
+---
 
 ## Features
 
-- **Weekly Analysis**: Fetches the latest price targets and updates analysts' accuracy every Monday at 9 AM.
-- **Top Analyst Identification**: Identifies and ranks the top 10 analysts based on their prediction accuracy and volume.
-- **RSS Feed Generation**: Generates and updates an RSS feed every 12 hours with the latest reports from the top analysts.
-- **Scheduling**: Automates tasks using the `schedule` library for seamless operation.
-- **Logging**: Provides detailed logs for monitoring and debugging.
+- **Customizable Time Horizon**: Specify the number of days over which to evaluate analyst predictions.
+- **Analyst Performance Evaluation**: Fetches price targets and compares them to actual stock prices to assess accuracy.
+- **Top Analysts Identification**: Ranks analysts based on accuracy and prediction volume, selecting the top 10.
+- **RSS Feed Generation**: Generates and updates an RSS feed with the latest reports from top analysts every 12 hours.
+- **Automated Scheduling**: Schedules weekly analyses and RSS feed updates.
+- **Multithreaded Data Fetching**: Utilizes multithreading for efficient data retrieval.
+- **API Rate Limiting**: Implements rate limiting to comply with API usage policies.
+- **Detailed Logging**: Provides comprehensive logging for monitoring and debugging.
+
+---
 
 ## Installation
 
 ### Prerequisites
 
-- **Python 3.7 or higher**
+- **Python3**
 - **Financial Modeling Prep API Key**
 
-### Required Python Libraries
+### Clone the Repository
 
-Ensure you have the following libraries installed:
+```bash
+git clone https://github.com/yourusername/AnalystRSS.git
+cd AnalystRSS
+```
 
-- `requests`
-- `pandas`
-- `yfinance`
-- `schedule`
-- `feedgen`
-- `python-dotenv`
+### Install Dependencies
 
-### Setup Instructions
+It is recommended to use a virtual environment.
 
-1. **Clone the Repository**
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+pip install -r requirements.txt
+```
 
-   ```bash
-   git clone https://github.com/yourusername/AnalystRSS.git
-   cd AnalystRSS
-   ```
+### Set Up Environment Variables
 
-2. **Install Required Libraries**
+Create a `.env` file in the project root directory and add your Financial Modeling Prep API key:
 
-   Install the required Python libraries using `pip`:
+```
+FMP_API_KEY=your_api_key_here
+```
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+Replace `your_api_key_here` with your actual API key.
 
-   *Alternatively, install them manually:*
+### Prepare the Symbols File
 
-   ```bash
-   pip install requests pandas yfinance schedule feedgen python-dotenv
-   ```
+Create a `symbols.txt` file in the project directory with a list of stock symbols to analyze, one per line:
 
-3. **Set Up API Key**
+```
+AAPL
+MSFT
+GOOGL
+```
 
-   - Obtain your API key from [Financial Modeling Prep](https://financialmodelingprep.com/developer/docs/).
-   - Create a `.env` file in the root directory of the project:
+A comprehensive list of stock symbols is provided in `symbols.txt`.
 
-     ```bash
-     touch .env
-     ```
-
-   - Add your API key to the `.env` file:
-
-     ```env
-     FMP_API_KEY=your_api_key_here
-     ```
-
-4. **Prepare Symbols File**
-
-   - Create a text file (e.g., `symbols.txt`) containing the list of stock symbols you want to analyze, one per line.
-
-     ```txt
-     AAPL
-     MSFT
-     GOOG
-     AMZN
-     ```
+---
 
 ## Usage
 
 Run the script using the following command:
 
 ```bash
-python analyst_prediction_analyzer.py --symbols symbols.txt
+python AnalystRSS.py --symbols symbols.txt [--timehorizon TIME_HORIZON] [--ratelimit RATE_LIMIT]
 ```
 
-The utility will start running and perform the following tasks:
+### Command-Line Arguments
 
-- **Weekly Analysis**: Every Monday at 9 AM, it will analyze analysts' predictions and update their accuracy data.
-- **RSS Feed Updates**: Every 12 hours, it will generate or update the RSS feed (`top_analysts_feed.xml`) with the latest reports from the top analysts.
+- `--symbols`: **(Required)** Path to the symbols text file.
+- `--timehorizon`: Time horizon in days to evaluate predictions. Default is **365** days.
+- `--ratelimit`: API rate limit (requests per minute). Default is **300**.
 
-### Logs
+### Examples
 
-- Activity is logged to `analyst_prediction_analyzer.log`. Check this file for detailed logs and error messages.
+- Run with default settings:
 
-### RSS Feed
+  ```bash
+  python AnalystRSS.py --symbols symbols.txt
+  ```
 
-- The RSS feed is generated as `top_analysts_feed.xml` in the project directory.
-- Users can subscribe to this feed using any RSS reader to receive updates on the top analysts.
+- Specify a custom time horizon and rate limit:
+
+  ```bash
+  python AnalystRSS.py --symbols symbols.txt --timehorizon 180 --ratelimit 200
+  ```
+
+---
 
 ## Configuration
 
-- **Scheduling**: Adjust scheduling times by modifying the `schedule.every().monday.at("09:00").do(weekly_analysis)` and `schedule.every(12).hours.do(update_rss_feed)` lines in the script.
-- **Minimum Predictions**: Change the `min_predictions` parameter in the `find_top_analysts` function to adjust the minimum number of predictions required for an analyst to be considered.
+### Adjusting the Time Horizon
+
+The `--timehorizon` argument allows you to specify the number of days over which analyst predictions are evaluated. For example, `--timehorizon 180` evaluates predictions over a 6-month period.
+
+### API Rate Limiting
+
+To comply with API usage policies, the script implements rate limiting. You can adjust the rate limit using the `--ratelimit` argument.
+
+---
+
+## Scheduling
+
+The script uses the `schedule` library to automate tasks:
+
+- **Weekly Analysis**: The `weekly_analysis` function is scheduled to run every Monday at 9 AM. It fetches the latest price targets, compares them to actual stock prices, updates analysts' accuracy data, and identifies the top analysts.
+
+- **RSS Feed Updates**: The `update_rss_feed` function is scheduled to run every 12 hours. It generates or updates the RSS feed with the latest reports from the top analysts.
+
+### Modifying the Schedule
+
+You can adjust the scheduling by modifying the `main()` function in `AnalystRSS.py`:
+
+```python
+# Schedule weekly_analysis() every Monday at 9 AM
+schedule.every().monday.at("09:00").do(weekly_analysis)
+
+# Schedule update_rss_feed() every 12 hours
+schedule.every(12).hours.do(update_rss_feed)
+```
+
+---
+
+## Output
+
+### Generated Files
+
+- **analyst_accuracy.csv**: Contains the calculated skill scores and accuracy metrics for analysts.
+- **top_analysts_feed.xml**: The generated RSS feed with the latest reports from the top analysts.
+- **analyst_prediction_analyzer.log**: Log file containing detailed execution logs.
+
+---
 
 ## How It Works
 
-1. **Fetching Analyst Data**
+1. **Fetch Price Targets**: The script fetches price targets for the specified symbols from the Financial Modeling Prep API.
 
-   - Reads the list of stock symbols from the `symbols.txt` file.
-   - Fetches the latest price targets for these symbols from the Financial Modeling Prep API.
-   - Retrieves historical stock price data using `yfinance`.
+2. **Fetch Historical Data**: It retrieves historical stock prices using the yfinance library.
 
-2. **Analyzing Predictions**
+3. **Analyze Analyst Skill**: The script calculates the prediction errors for each analyst over the specified time horizon and computes a skill score based on accuracy and breadth.
 
-   - Compares analysts' price targets to actual stock prices after a specified time horizon (default is 90 days).
-   - Calculates the percentage error for each prediction.
-   - Aggregates errors to compute an accuracy score for each analyst.
-   - Updates analysts' accuracy data and saves it to `analyst_accuracy.csv`.
+4. **Identify Top Analysts**: Analysts are ranked based on their skill score, and the top 10 are selected.
 
-3. **Identifying Top Analysts**
+5. **Generate RSS Feed**: An RSS feed is generated or updated with the latest reports from the top analysts.
 
-   - Filters out analysts with fewer than the minimum required predictions.
-   - Calculates a weighted score based on accuracy and the number of predictions.
-   - Ranks analysts and selects the top 10.
+6. **Scheduling**: The entire process is automated using scheduled tasks.
 
-4. **Generating RSS Feed**
+---
 
-   - Fetches the latest reports from the top analysts.
-   - Generates an RSS feed (`top_analysts_feed.xml`) containing:
-     - Analyst's name and company
-     - Their accuracy and prediction volume
-     - A brief description of their most recent reports or predictions
+## Logging
 
-## Troubleshooting
+The script provides detailed logging to both the console and a log file (`analyst_prediction_analyzer.log`). This includes information on data fetching, analysis progress, and any errors encountered.
 
-- **API Errors**: If you encounter API rate limit errors, adjust the script to handle rate limiting or consider upgrading your API plan.
-- **Missing Data**: Ensure that the symbols in your `symbols.txt` file are valid and that data is available for them.
-- **Logging**: Refer to `analyst_prediction_analyzer.log` for detailed error messages and logs.
+You can adjust the logging level by modifying the logging configuration in `AnalystRSS.py`:
+
+```python
+logging.basicConfig(
+    level=logging.INFO,  # Change to logging.DEBUG for more detailed logs
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[
+        logging.FileHandler("analyst_prediction_analyzer.log"),
+        logging.StreamHandler()
+    ]
+)
+```
+
+---
+
+## Dependencies
+
+All required dependencies are listed in `requirements.txt`:
+
+```plaintext
+requests
+pandas
+yfinance
+schedule
+feedgen
+python-dotenv
+tqdm
+python-dateutil
+```
+
+Install them using:
+
+```bash
+pip install -r requirements.txt
+```

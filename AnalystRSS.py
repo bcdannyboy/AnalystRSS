@@ -2,7 +2,7 @@
 
 """
 Analyst Prediction Analyzer Utility
-analyze the analysts then analyze their analysis
+Analyze the analysts, then analyze their analysis.
 
 This utility fetches analyst price targets and stock prices to evaluate the prediction accuracy
 of financial analysts. It analyzes the analysts' accuracy once a week and identifies the top 10
@@ -10,7 +10,7 @@ analysts based on their historical performance. It also generates and updates an
 12 hours with the latest reports from the top analysts.
 
 Usage:
-    python AnalystRSS.py --symbols symbols.txt
+    python AnalystRSS.py --symbols symbols.txt [--timehorizon TIME_HORIZON] [--ratelimit RATE_LIMIT]
 """
 
 import os
@@ -27,6 +27,9 @@ import time
 from dotenv import load_dotenv
 from feedgen.feed import FeedGenerator
 import urllib.parse
+from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # Load environment variables from .env file
 load_dotenv()
@@ -41,8 +44,10 @@ logging.basicConfig(level=logging.INFO,
                     ])
 logger = logging.getLogger(__name__)
 
-# Global variable for command-line arguments
-args = None
+# Global variables
+args = None  # Command-line arguments
+REQUESTS_LOCK = threading.Lock()  # Lock for thread-safe rate limiting
+REQUEST_TIMESTAMPS = []  # Timestamps of API requests for rate limiting
 
 def parse_arguments():
     """
@@ -53,6 +58,8 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser(description="Analyst Prediction Analyzer")
     parser.add_argument('--symbols', required=True, help='Path to the symbols txt file')
+    parser.add_argument('--ratelimit', type=int, default=300, help='API rate limit (requests per minute). Default: 300')
+    parser.add_argument('--timehorizon', type=int, default=365, help='Time horizon in days to evaluate predictions. Default: 365')
     return parser.parse_args()
 
 def read_symbols(symbols_file):
@@ -68,10 +75,41 @@ def read_symbols(symbols_file):
     try:
         with open(symbols_file, 'r') as f:
             symbols = [line.strip() for line in f if line.strip()]
+        logger.info(f"Read {len(symbols)} symbols from {symbols_file}")
         return symbols
     except Exception as e:
         logger.error(f"Error reading symbols file {symbols_file}: {e}")
         return []
+
+def rate_limited_request(url):
+    """
+    Makes a rate-limited HTTP GET request to the given URL.
+
+    Parameters:
+    url (str): The URL to request.
+
+    Returns:
+    requests.Response: The HTTP response object.
+    """
+    global REQUEST_TIMESTAMPS
+    with REQUESTS_LOCK:
+        # Clean up old timestamps
+        now = time.time()
+        REQUEST_TIMESTAMPS = [timestamp for timestamp in REQUEST_TIMESTAMPS if now - timestamp < 60]
+
+        # If we have reached the rate limit, wait
+        if len(REQUEST_TIMESTAMPS) >= args.ratelimit:
+            sleep_time = 60 - (now - REQUEST_TIMESTAMPS[0]) + 0.1  # Add a small buffer
+            logger.debug(f"Rate limit reached. Sleeping for {sleep_time:.2f} seconds.")
+            time.sleep(sleep_time)
+            REQUEST_TIMESTAMPS = [timestamp for timestamp in REQUEST_TIMESTAMPS if now - timestamp < 60]
+
+        # Record the request timestamp
+        REQUEST_TIMESTAMPS.append(time.time())
+
+    # Make the actual request
+    response = requests.get(url)
+    return response
 
 def get_latest_price_targets(analyst_name):
     """
@@ -86,7 +124,7 @@ def get_latest_price_targets(analyst_name):
     try:
         encoded_name = urllib.parse.quote(analyst_name)
         url = f"https://financialmodelingprep.com/api/v4/price-target-analyst-name?name={encoded_name}&apikey={API_KEY}"
-        response = requests.get(url)
+        response = rate_limited_request(url)
         if response.status_code == 200:
             data = response.json()
             if data:
@@ -136,9 +174,35 @@ def get_current_stock_price(symbol):
         logger.error(f"Error fetching current stock price for {symbol}: {e}")
         return None
 
+def fetch_price_target(symbol):
+    """
+    Fetches price targets for a single symbol from the Financial Modeling Prep API.
+
+    Parameters:
+    symbol (str): Stock symbol.
+
+    Returns:
+    pandas.DataFrame or None: DataFrame containing price targets for the symbol or None if an error occurs.
+    """
+    try:
+        url = f"https://financialmodelingprep.com/api/v4/price-target?symbol={symbol}&apikey={API_KEY}"
+        response = rate_limited_request(url)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                price_target_df = pd.DataFrame(data)
+                price_target_df["symbol"] = symbol
+                return price_target_df
+        else:
+            logger.error(f"Error fetching price target data for {symbol}: {response.status_code}")
+            return None
+    except Exception as e:
+        logger.error(f"Exception in fetch_price_target for {symbol}: {e}")
+        return None
+
 def get_price_targets_for_symbols(symbols):
     """
-    Fetches price targets for a list of symbols from the Financial Modeling Prep API.
+    Fetches price targets for a list of symbols using multithreading.
 
     Parameters:
     symbols (list): List of stock symbols.
@@ -147,46 +211,73 @@ def get_price_targets_for_symbols(symbols):
     pandas.DataFrame: DataFrame containing price targets for the symbols.
     """
     all_price_targets = []
-    for symbol in symbols:
-        try:
-            url = f"https://financialmodelingprep.com/api/v4/price-target?symbol={symbol}&apikey={API_KEY}"
-            response = requests.get(url)
-            if response.status_code == 200:
-                data = response.json()
-                if data:
-                    price_target_df = pd.DataFrame(data)
-                    price_target_df["symbol"] = symbol
-                    all_price_targets.append(price_target_df)
-            else:
-                logger.error(f"Error fetching price target data for {symbol}: {response.status_code}")
-        except Exception as e:
-            logger.error(f"Exception in get_price_targets_for_symbols for {symbol}: {e}")
+    logger.info("Fetching price targets for symbols using multithreading...")
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_symbol = {executor.submit(fetch_price_target, symbol): symbol for symbol in symbols}
+        for future in tqdm(as_completed(future_to_symbol), total=len(future_to_symbol), desc="Fetching price targets"):
+            symbol = future_to_symbol[future]
+            try:
+                result = future.result()
+                if result is not None:
+                    all_price_targets.append(result)
+            except Exception as e:
+                logger.error(f"Error fetching price targets for {symbol}: {e}")
     if all_price_targets:
         all_price_target_df = pd.concat(all_price_targets, ignore_index=True)
+        logger.info(f"Fetched price targets for {len(all_price_targets)} symbols.")
         return all_price_target_df
     else:
+        logger.warning("No price targets fetched.")
         return pd.DataFrame()
 
-def get_historical_data(symbol):
+def fetch_historical_data(symbol):
     """
-    Fetches historical stock price data for a given symbol using yfinance.
+    Fetches historical stock price data for a single symbol using yfinance.
 
     Parameters:
-    symbol (str): The stock symbol.
+    symbol (str): Stock symbol.
 
     Returns:
-    pandas.Series: Series containing historical 'Close' prices, or None if not found.
+    pandas.Series or None: Series containing historical 'Close' prices or None if an error occurs.
     """
     try:
         stock = yf.Ticker(symbol)
         hist = stock.history(period="max")
         if not hist.empty:
-            return hist['Close']
+            hist_data = hist['Close']
+            hist_data.index = hist_data.index.normalize()
+            return hist_data
         else:
+            logger.warning(f"No historical data for symbol: {symbol}")
             return None
     except Exception as e:
         logger.error(f"Error fetching historical data for {symbol}: {e}")
         return None
+
+def get_historical_data(symbols):
+    """
+    Fetches historical stock price data for a list of symbols using multithreading.
+
+    Parameters:
+    symbols (list): List of stock symbols.
+
+    Returns:
+    dict: Dictionary containing historical 'Close' prices for each symbol.
+    """
+    all_hist_data = {}
+    logger.info("Fetching historical data for symbols using multithreading...")
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_symbol = {executor.submit(fetch_historical_data, symbol): symbol for symbol in symbols}
+        for future in tqdm(as_completed(future_to_symbol), total=len(future_to_symbol), desc="Fetching historical data"):
+            symbol = future_to_symbol[future]
+            try:
+                result = future.result()
+                if result is not None:
+                    all_hist_data[symbol] = result
+            except Exception as e:
+                logger.error(f"Error fetching historical data for {symbol}: {e}")
+    logger.info(f"Fetched historical data for {len(all_hist_data)} symbols.")
+    return all_hist_data
 
 def analyze_analyst_skill(price_targets_df, symbols, output_file='analyst_accuracy.csv', time_horizon_days=90):
     """
@@ -210,19 +301,17 @@ def analyze_analyst_skill(price_targets_df, symbols, output_file='analyst_accura
     price_targets_df.set_index('publishedDate', inplace=True)
 
     # Fetch historical data for symbols
-    logger.info("Fetching historical data for symbols...")
-    all_hist_data = {}
-    for symbol in symbols:
-        hist_data = get_historical_data(symbol)
-        if hist_data is not None:
-            hist_data.index = hist_data.index.normalize()
-            all_hist_data[symbol] = hist_data
+    all_hist_data = get_historical_data(symbols)
+    if not all_hist_data:
+        logger.error("No historical data to analyze.")
+        return
 
     # Prepare data for analysis
     analyst_skill = {}
 
     # Analyze each symbol
-    for symbol in symbols:
+    logger.info("Calculating prediction errors...")
+    for symbol in tqdm(symbols, desc="Analyzing symbols"):
         if symbol not in all_hist_data:
             continue
 
@@ -293,6 +382,10 @@ def analyze_analyst_skill(price_targets_df, symbols, output_file='analyst_accura
                     "total_error": group["percentage_error"].sum(),
                     "unique_symbols": set(group["symbol"].unique())
                 }
+
+    if not analyst_skill:
+        logger.warning("No analyst skill data calculated.")
+        return
 
     # Calculate final skill score for each analyst
     for name in analyst_skill:
@@ -380,28 +473,34 @@ def update_rss_feed():
         logger.error("No top analysts to generate RSS feed.")
         return
 
-    # Fetch the latest reports from the top analysts
-    # For each top analyst, fetch their latest price targets
+    # Fetch the latest reports from the top analysts using multithreading
     feed_entries = []
-    for idx, row in top_analysts.iterrows():
-        analyst_name = row['analystName']
-        latest_alerts = get_latest_price_targets(analyst_name)
-        if latest_alerts:
-            for alert in latest_alerts:
-                # Build the RSS feed entry
-                feed_entry = {
-                    'analystName': analyst_name,
-                    'analystCompany': row['analystCompany'],
-                    'accuracy': row['accuracy'],
-                    'total_predictions': row['total_predictions'],
-                    'newsTitle': alert.get('newsTitle', ''),
-                    'newsURL': alert.get('newsURL', ''),
-                    'publishedDate': alert.get('publishedDate', ''),
-                    'description': alert.get('newsTitle', '')
-                }
-                feed_entries.append(feed_entry)
-        else:
-            logger.warning(f"No recent alerts for analyst {analyst_name}")
+    logger.info("Fetching latest reports from top analysts using multithreading...")
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_analyst = {executor.submit(get_latest_price_targets, row['analystName']): row for idx, row in top_analysts.iterrows()}
+        for future in tqdm(as_completed(future_to_analyst), total=len(future_to_analyst), desc="Fetching analyst reports"):
+            row = future_to_analyst[future]
+            analyst_name = row['analystName']
+            try:
+                latest_alerts = future.result()
+                if latest_alerts:
+                    for alert in latest_alerts:
+                        # Build the RSS feed entry
+                        feed_entry = {
+                            'analystName': analyst_name,
+                            'analystCompany': row['analystCompany'],
+                            'accuracy': row['accuracy'],
+                            'total_predictions': row['total_predictions'],
+                            'newsTitle': alert.get('newsTitle', ''),
+                            'newsURL': alert.get('newsURL', ''),
+                            'publishedDate': alert.get('publishedDate', ''),
+                            'description': alert.get('newsTitle', '')
+                        }
+                        feed_entries.append(feed_entry)
+                else:
+                    logger.warning(f"No recent alerts for analyst {analyst_name}")
+            except Exception as e:
+                logger.error(f"Error fetching latest reports for analyst {analyst_name}: {e}")
 
     # Generate the RSS feed
     if feed_entries:
@@ -445,15 +544,13 @@ def weekly_analysis():
         return
 
     # Fetch price targets for the symbols
-    logger.info("Fetching price targets for symbols...")
     price_targets_df = get_price_targets_for_symbols(symbols)
     if price_targets_df.empty:
         logger.error("No price target data fetched.")
         return
 
     # Analyze analysts' predictions
-    logger.info("Analyzing analysts' predictions...")
-    analyze_analyst_skill(price_targets_df, symbols)
+    analyze_analyst_skill(price_targets_df, symbols, time_horizon_days=args.timehorizon)
 
     logger.info("Weekly analysis completed.")
 
@@ -468,6 +565,9 @@ def main():
     if not API_KEY:
         logger.error("API Key not found. Please set FMP_API_KEY in .env file.")
         sys.exit(1)
+
+    logger.info(f"Using API rate limit: {args.ratelimit} requests per minute.")
+    logger.info(f"Using time horizon: {args.timehorizon} days for prediction analysis.")
 
     # Perform initial analysis and RSS feed update
     logger.info("Performing initial analysis and RSS feed update...")
