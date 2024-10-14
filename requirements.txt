@@ -1,0 +1,6 @@
+requests
+pandas
+yfinance
+schedule
+feedgen
+python-dotenv
