@@ -2,33 +2,43 @@
 
 **Analyze the analysts, then analyze their analysis**
 
----
+AnalystRSS is a Python utility that fetches analyst price targets and stock prices to evaluate the prediction accuracy of financial analysts. It performs weekly analysis to identify the top analysts based on their historical performance and generates an RSS feed with the latest reports from these top analysts. The RSS feed is updated every 12 hours and served via an HTTP server.
 
-## Introduction
+## Table of Contents
 
-AnalystRSS is a powerful utility designed to evaluate the prediction accuracy of financial analysts. By fetching analysts' price targets and comparing them with actual stock prices over a customizable time horizon, it identifies the top-performing analysts based on historical performance. The tool then generates an RSS feed with the latest reports from these top analysts, updating it every 12 hours. AnalystRSS automates the entire process, providing investors and researchers with insights into analyst performance to inform investment decisions.
-
----
+- [Features](#features)
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Clone the Repository](#clone-the-repository)
+  - [Install Dependencies](#install-dependencies)
+  - [Set Up Environment Variables](#set-up-environment-variables)
+- [Usage](#usage)
+  - [Command-Line Arguments](#command-line-arguments)
+  - [Examples](#examples)
+- [Configuration](#configuration)
+- [Logging](#logging)
+- [Scheduling Tasks](#scheduling-tasks)
+- [API Key Acquisition](#api-key-acquisition)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
-- **Customizable Time Horizon**: Specify the number of days over which to evaluate analyst predictions.
-- **Analyst Performance Evaluation**: Fetches price targets and compares them to actual stock prices to assess accuracy.
-- **Top Analysts Identification**: Ranks analysts based on accuracy and prediction volume, selecting the top 10.
-- **RSS Feed Generation**: Generates and updates an RSS feed with the latest reports from top analysts every 12 hours.
-- **Automated Scheduling**: Schedules weekly analyses and RSS feed updates.
-- **Multithreaded Data Fetching**: Utilizes multithreading for efficient data retrieval.
-- **API Rate Limiting**: Implements rate limiting to comply with API usage policies.
-- **Detailed Logging**: Provides comprehensive logging for monitoring and debugging.
-
----
+- **Analyst Accuracy Analysis**: Evaluates financial analysts by comparing their price targets to actual stock performance over a specified time horizon.
+- **Top Analyst Identification**: Identifies the top analysts based on accuracy and prediction volume.
+- **RSS Feed Generation**: Creates an RSS feed with the latest reports from the top analysts.
+- **HTTP Server**: Serves the RSS feed via a built-in HTTP server.
+- **Scheduled Tasks**: Automatically updates analyst accuracy data weekly and refreshes the RSS feed every 12 hours.
+- **Multi-threaded Data Fetching**: Uses multi-threading to efficiently fetch data from APIs.
+- **Rate Limiting**: Includes built-in rate limiting to comply with API usage policies.
+- **Logging**: Provides detailed logs for monitoring and debugging purposes.
 
 ## Installation
 
 ### Prerequisites
 
-- **Python3**
-- **Financial Modeling Prep API Key**
+- **Python 3.7 or higher**
+- **pip** (Python package manager)
 
 ### Clone the Repository
 
@@ -39,164 +49,273 @@ cd AnalystRSS
 
 ### Install Dependencies
 
-It is recommended to use a virtual environment.
+It's recommended to use a virtual environment to avoid conflicts with other Python packages.
+
+#### Using `venv`
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+#### Using `pipenv` (Optional)
+
+If you prefer `pipenv`, you can use:
+
+```bash
+pip install pipenv
+pipenv install
 ```
 
 ### Set Up Environment Variables
 
-Create a `.env` file in the project root directory and add your Financial Modeling Prep API key:
+Create a `.env` file in the root directory of the project and add your [Financial Modeling Prep API](https://financialmodelingprep.com/) key:
 
-```
+```ini
 FMP_API_KEY=your_api_key_here
 ```
 
-Replace `your_api_key_here` with your actual API key.
-
-### Prepare the Symbols File
-
-Create a `symbols.txt` file in the project directory with a list of stock symbols to analyze, one per line:
-
-```
-AAPL
-MSFT
-GOOGL
-```
-
-A comprehensive list of stock symbols is provided in `symbols.txt`.
-
----
-
 ## Usage
 
-Run the script using the following command:
-
-```bash
-python AnalystRSS.py --symbols symbols.txt [--timehorizon TIME_HORIZON] [--ratelimit RATE_LIMIT]
-```
+The script can be run from the command line with various options.
 
 ### Command-Line Arguments
 
-- `--symbols`: **(Required)** Path to the symbols text file.
-- `--timehorizon`: Time horizon in days to evaluate predictions. Default is **365** days.
-- `--ratelimit`: API rate limit (requests per minute). Default is **300**.
+- `--symbols`: **(Required)** Path to the text file containing stock symbols, one per line.
+- `--ratelimit`: API rate limit (requests per minute). Default: `300`.
+- `--timehorizon`: Time horizon in days to evaluate predictions. Default: `365`.
+- `--host`: Host address to run the RSS server on. Default: `0.0.0.0`.
+- `--port`: Port number to run the RSS server on. Default: `5000`.
 
 ### Examples
 
-- Run with default settings:
+#### Basic Usage
 
-  ```bash
-  python AnalystRSS.py --symbols symbols.txt
-  ```
+```bash
+python AnalystRSS.py --symbols symbols.txt
+```
 
-- Specify a custom time horizon and rate limit:
+#### Custom Time Horizon and Rate Limit
 
-  ```bash
-  python AnalystRSS.py --symbols symbols.txt --timehorizon 180 --ratelimit 200
-  ```
+```bash
+python AnalystRSS.py --symbols symbols.txt --timehorizon 180 --ratelimit 200
+```
 
----
+#### Custom Host and Port for RSS Server
+
+```bash
+python AnalystRSS.py --symbols symbols.txt --host 127.0.0.1 --port 8080
+```
 
 ## Configuration
 
-### Adjusting the Time Horizon
+- **Symbols File**: A text file containing the stock symbols you want to analyze, one symbol per line.
+- **.env File**: Contains environment variables, specifically the `FMP_API_KEY`.
+- **API Rate Limit**: Adjust the `--ratelimit` argument to match your API plan's limitations.
+- **Time Horizon**: Set the `--timehorizon` argument to specify how many days ahead the analyst predictions should be evaluated.
+- **Logging Level**: The logging level is set to `INFO` by default. To enable more detailed logs, change `level=logging.INFO` to `level=logging.DEBUG` in the script.
 
-The `--timehorizon` argument allows you to specify the number of days over which analyst predictions are evaluated. For example, `--timehorizon 180` evaluates predictions over a 6-month period.
+## Logging
 
-### API Rate Limiting
+Logs are written to both the console and a file named `analyst_prediction_analyzer.log`. The log includes timestamps, log levels, and messages to help you monitor the script's execution and troubleshoot if necessary.
 
-To comply with API usage policies, the script implements rate limiting. You can adjust the rate limit using the `--ratelimit` argument.
-
----
-
-## Scheduling
+## Scheduling Tasks
 
 The script uses the `schedule` library to automate tasks:
 
-- **Weekly Analysis**: The `weekly_analysis` function is scheduled to run every Sunday at Midnight. It fetches the latest price targets, compares them to actual stock prices, updates analysts' accuracy data, and identifies the top analysts.
+- **Weekly Analysis**: Runs every Sunday at 12:00 AM to update analyst accuracy data.
+- **RSS Feed Update**: Runs every 12 hours to refresh the RSS feed with the latest reports.
 
-- **RSS Feed Updates**: The `update_rss_feed` function is scheduled to run every 12 hours. It generates or updates the RSS feed with the latest reports from the top analysts.
-
-### Modifying the Schedule
-
-You can adjust the scheduling by modifying the `main()` function in `AnalystRSS.py`:
+These schedules are defined in the `main()` function:
 
 ```python
-# Schedule weekly_analysis() every Sunday at Midnight
-schedule.every().Sunday.at("00:00").do(weekly_analysis)
+# Schedule weekly_analysis() every Sunday at 12 AM
+schedule.every().sunday.at("00:00").do(weekly_analysis)
 
 # Schedule update_rss_feed() every 12 hours
 schedule.every(12).hours.do(update_rss_feed)
 ```
 
+## API Key Acquisition
+
+The script requires an API key from [Financial Modeling Prep](https://financialmodelingprep.com/).
+
+1. Sign up for a free account at [Financial Modeling Prep](https://financialmodelingprep.com/developer/docs).
+2. Obtain your API key from the dashboard.
+3. Add the API key to your `.env` file:
+
+```ini
+FMP_API_KEY=your_api_key_here
+```
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository.
+2. Create a new branch: `git checkout -b feature/YourFeature`.
+3. Commit your changes: `git commit -am 'Add your feature'`.
+4. Push to the branch: `git push origin feature/YourFeature`.
+5. Submit a pull request.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
 ---
 
-## Output
+Feel free to customize and extend the utility to suit your needs. If you encounter any issues or have suggestions, please open an issue on the repository.
 
-### Generated Files
+# Answer
 
-- **analyst_accuracy.csv**: Contains the calculated skill scores and accuracy metrics for analysts.
-- **top_analysts_feed.xml**: The generated RSS feed with the latest reports from the top analysts.
-- **analyst_prediction_analyzer.log**: Log file containing detailed execution logs.
+# AnalystRSS
 
----
+**Analyze the analysts, then analyze their analysis**
 
-## How It Works
+AnalystRSS is a Python utility that fetches analyst price targets and stock prices to evaluate the prediction accuracy of financial analysts. It performs weekly analysis to identify the top analysts based on their historical performance and generates an RSS feed with the latest reports from these top analysts. The RSS feed is updated every 12 hours and served via an HTTP server.
 
-1. **Fetch Price Targets**: The script fetches price targets for the specified symbols from the Financial Modeling Prep API.
+## Table of Contents
 
-2. **Fetch Historical Data**: It retrieves historical stock prices using the yfinance library.
+- [Features](#features)
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Clone the Repository](#clone-the-repository)
+  - [Install Dependencies](#install-dependencies)
+  - [Set Up Environment Variables](#set-up-environment-variables)
+- [Usage](#usage)
+  - [Command-Line Arguments](#command-line-arguments)
+  - [Examples](#examples)
+- [Configuration](#configuration)
+- [Logging](#logging)
+- [Scheduling Tasks](#scheduling-tasks)
+- [API Key Acquisition](#api-key-acquisition)
+- [Contributing](#contributing)
+- [License](#license)
 
-3. **Analyze Analyst Skill**: The script calculates the prediction errors for each analyst over the specified time horizon and computes a skill score based on accuracy and breadth.
+## Features
 
-4. **Identify Top Analysts**: Analysts are ranked based on their skill score, and the top 10 are selected.
+- **Analyst Accuracy Analysis**: Evaluates financial analysts by comparing their price targets to actual stock performance over a specified time horizon.
+- **Top Analyst Identification**: Identifies the top analysts based on accuracy and prediction volume.
+- **RSS Feed Generation**: Creates an RSS feed with the latest reports from the top analysts.
+- **HTTP Server**: Serves the RSS feed via a built-in HTTP server.
+- **Scheduled Tasks**: Automatically updates analyst accuracy data weekly and refreshes the RSS feed every 12 hours.
+- **Multi-threaded Data Fetching**: Uses multi-threading to efficiently fetch data from APIs.
+- **Rate Limiting**: Includes built-in rate limiting to comply with API usage policies.
+- **Logging**: Provides detailed logs for monitoring and debugging purposes.
 
-5. **Generate RSS Feed**: An RSS feed is generated or updated with the latest reports from the top analysts.
+## Installation
 
-6. **Scheduling**: The entire process is automated using scheduled tasks.
+### Prerequisites
 
----
+- **Python 3.7 or higher**
+- **pip** (Python package manager)
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/AnalystRSS.git
+cd AnalystRSS
+```
+
+### Install Dependencies
+
+It's recommended to use a virtual environment to avoid conflicts with other Python packages.
+
+#### Using `venv`
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+#### Using `pipenv` (Optional)
+
+If you prefer `pipenv`, you can use:
+
+```bash
+pip install pipenv
+pipenv install
+```
+
+### Set Up Environment Variables
+
+Create a `.env` file in the root directory of the project and add your [Financial Modeling Prep API](https://financialmodelingprep.com/) key:
+
+```ini
+FMP_API_KEY=your_api_key_here
+```
+
+## Usage
+
+The script can be run from the command line with various options.
+
+### Command-Line Arguments
+
+- `--symbols`: **(Required)** Path to the text file containing stock symbols, one per line.
+- `--ratelimit`: API rate limit (requests per minute). Default: `300`.
+- `--timehorizon`: Time horizon in days to evaluate predictions. Default: `365`.
+- `--host`: Host address to run the RSS server on. Default: `0.0.0.0`.
+- `--port`: Port number to run the RSS server on. Default: `5000`.
+
+### Examples
+
+#### Basic Usage
+
+```bash
+python AnalystRSS.py --symbols symbols.txt
+```
+
+#### Custom Time Horizon and Rate Limit
+
+```bash
+python AnalystRSS.py --symbols symbols.txt --timehorizon 180 --ratelimit 200
+```
+
+#### Custom Host and Port for RSS Server
+
+```bash
+python AnalystRSS.py --symbols symbols.txt --host 127.0.0.1 --port 8080
+```
+
+## Configuration
+
+- **Symbols File**: A text file containing the stock symbols you want to analyze, one symbol per line.
+- **.env File**: Contains environment variables, specifically the `FMP_API_KEY`.
+- **API Rate Limit**: Adjust the `--ratelimit` argument to match your API plan's limitations.
+- **Time Horizon**: Set the `--timehorizon` argument to specify how many days ahead the analyst predictions should be evaluated.
+- **Logging Level**: The logging level is set to `INFO` by default. To enable more detailed logs, change `level=logging.INFO` to `level=logging.DEBUG` in the script.
 
 ## Logging
 
-The script provides detailed logging to both the console and a log file (`analyst_prediction_analyzer.log`). This includes information on data fetching, analysis progress, and any errors encountered.
+Logs are written to both the console and a file named `analyst_prediction_analyzer.log`. The log includes timestamps, log levels, and messages to help you monitor the script's execution and troubleshoot if necessary.
 
-You can adjust the logging level by modifying the logging configuration in `AnalystRSS.py`:
+## Scheduling Tasks
+
+The script uses the `schedule` library to automate tasks:
+
+- **Weekly Analysis**: Runs every Sunday at 12:00 AM to update analyst accuracy data.
+- **RSS Feed Update**: Runs every 12 hours to refresh the RSS feed with the latest reports.
+
+These schedules are defined in the `main()` function:
 
 ```python
-logging.basicConfig(
-    level=logging.INFO,  # Change to logging.DEBUG for more detailed logs
-    format='%(asctime)s %(levelname)s: %(message)s',
-    handlers=[
-        logging.FileHandler("analyst_prediction_analyzer.log"),
-        logging.StreamHandler()
-    ]
-)
+# Schedule weekly_analysis() every Sunday at 12 AM
+schedule.every().sunday.at("00:00").do(weekly_analysis)
+
+# Schedule update_rss_feed() every 12 hours
+schedule.every(12).hours.do(update_rss_feed)
 ```
 
----
+## API Key Acquisition
 
-## Dependencies
+The script requires an API key from [Financial Modeling Prep](https://financialmodelingprep.com/).
 
-All required dependencies are listed in `requirements.txt`:
+1. Sign up for a free account at [Financial Modeling Prep](https://financialmodelingprep.com/developer/docs).
+2. Obtain your API key from the dashboard.
+3. Add the API key to your `.env` file:
 
-```plaintext
-requests
-pandas
-yfinance
-schedule
-feedgen
-python-dotenv
-tqdm
-python-dateutil
-```
-
-Install them using:
-
-```bash
-pip install -r requirements.txt
+```ini
+FMP_API_KEY=your_api_key_here
 ```
