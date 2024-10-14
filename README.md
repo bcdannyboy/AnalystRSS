@@ -117,7 +117,7 @@ To comply with API usage policies, the script implements rate limiting. You can 
 
 The script uses the `schedule` library to automate tasks:
 
-- **Weekly Analysis**: The `weekly_analysis` function is scheduled to run every Monday at 9 AM. It fetches the latest price targets, compares them to actual stock prices, updates analysts' accuracy data, and identifies the top analysts.
+- **Weekly Analysis**: The `weekly_analysis` function is scheduled to run every Sunday at Midnight. It fetches the latest price targets, compares them to actual stock prices, updates analysts' accuracy data, and identifies the top analysts.
 
 - **RSS Feed Updates**: The `update_rss_feed` function is scheduled to run every 12 hours. It generates or updates the RSS feed with the latest reports from the top analysts.
 
@@ -126,8 +126,8 @@ The script uses the `schedule` library to automate tasks:
 You can adjust the scheduling by modifying the `main()` function in `AnalystRSS.py`:
 
 ```python
-# Schedule weekly_analysis() every Monday at 9 AM
-schedule.every().monday.at("09:00").do(weekly_analysis)
+# Schedule weekly_analysis() every Sunday at Midnight
+schedule.every().Sunday.at("00:00").do(weekly_analysis)
 
 # Schedule update_rss_feed() every 12 hours
 schedule.every(12).hours.do(update_rss_feed)

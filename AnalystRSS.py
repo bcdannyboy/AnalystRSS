@@ -574,8 +574,8 @@ def main():
     weekly_analysis()
     update_rss_feed()
 
-    # Schedule weekly_analysis() every Monday at 9 AM
-    schedule.every().monday.at("09:00").do(weekly_analysis)
+    # Schedule weekly_analysis() every Sunday at 12 AM
+    schedule.every().sunday.at("00:00").do(weekly_analysis)
 
     # Schedule update_rss_feed() every 12 hours
     schedule.every(12).hours.do(update_rss_feed)

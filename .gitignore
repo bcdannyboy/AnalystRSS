@@ -1,5 +1,6 @@
 analyst_prediction_analyzer.log
 top_analysts_feed.xml
+analyst_accuracy.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
