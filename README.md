@@ -20,7 +20,6 @@ AnalystRSS is a Python utility that fetches analyst price targets and stock pric
 - [Scheduling Tasks](#scheduling-tasks)
 - [API Key Acquisition](#api-key-acquisition)
 - [Contributing](#contributing)
-- [License](#license)
 
 ## Features
 
