@@ -43,7 +43,7 @@ AnalystRSS is a Python utility that fetches analyst price targets and stock pric
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/AnalystRSS.git
+git clone https://github.com/bcdannyboy/AnalystRSS.git
 cd AnalystRSS
 ```
 
@@ -214,7 +214,7 @@ AnalystRSS is a Python utility that fetches analyst price targets and stock pric
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/AnalystRSS.git
+git clone https://github.com/bcdannyboy/AnalystRSS.git
 cd AnalystRSS
 ```
 
